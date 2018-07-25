@@ -14,7 +14,31 @@ class HoughTransform:
 	def __init__(self):
 		return
 
-	def execute(self, image, angle_resolution):
+	def write_lines(self, image, hough_space, angle_resolution):
+		# find the bins brighter than threshold_percent*255 for the addtion of lines
+		threshold_percent = 0.7
+		threshold = int(threshold_percent*255)
+
+		y_length, x_length = image.shape
+		thetas = numpy.deg2rad(numpy.arange(-90.0, 90.0, angle_resolution))
+		max_distance = int(math.ceil(math.sqrt(y_length*y_length + x_length*x_length)))
+		for i_pho in range(hough_space.shape[0]):
+			for i_theta in range(hough_space.shape[1]):
+				if hough_space[i_pho][i_theta] >= threshold:
+					theta = thetas[i_theta]
+					pho = i_pho - max_distance
+					a = math.cos(theta)
+					b = math.sin(theta)
+					x0 = a*pho
+					y0 = b*pho
+					x1 = int(x0 + 10000*(-b))
+					y1 = int(y0 + 10000*(a))
+					x2 = int(x0 - 10000*(-b))
+					y2 = int(y0 - 10000*(a))
+					cv2.line(image,(x1,y1),(x2,y2),120)
+		return image
+
+	def get_normalized_hough_space(self, image, angle_resolution):
 		thetas = numpy.deg2rad(numpy.arange(-90.0, 90.0, angle_resolution))
 		y_length, x_length = image.shape
 		max_distance = int(math.ceil(math.sqrt(y_length*y_length + x_length*x_length)))
@@ -35,20 +59,30 @@ class HoughTransform:
 							max_bin_size = hough_space[max_distance + pho][i_theta]
 
 		# normalize the output space to 0 to 255:
-		for y in range(hough_space.shape[0]):
-			for x in range(hough_space.shape[1]):
-				hough_space[y][x]*=(255.0/max_bin_size)
-
-		# resize the image
-		hough_space = scipy.misc.imresize(hough_space, size=image.shape)
+		for pho in range(hough_space.shape[0]):
+			for theta in range(hough_space.shape[1]):
+				hough_space[pho][theta]*=(255.0/max_bin_size)
 
 		return hough_space
+
+
+	def execute(self, image, angle_resolution, write_hough_space):
+		hough_space = self.get_normalized_hough_space(image, angle_resolution)
+		output_image = None;
+		if write_hough_space:
+			# resize the space to match the image
+			output_image = scipy.misc.imresize(hough_space, size=image.shape)
+		else:
+			output_image = self.write_lines(image, hough_space, angle_resolution)
+
+		return output_image
 
 # main (DRIVER)
 def main():
 	parser = argparse.ArgumentParser(description="Hough Transform")
 	parser.add_argument("input_filename", help="jpg or png input image file path")
 	parser.add_argument("-a", "--angle_resolution", type=float, default=1.0, metavar="angle_resolution", help="Angle resolution in degrees.  180/angle_resolution number of bins.  A lower angle value may give you more acurate lines, but will take longer to run.  The angle_resolution you choose must divide 180 without remainder: 180%angle_resolution == 0.")
+	parser.add_argument("-w", "--write_hough_space", action="store_true", help="Outputs an image of the hough space instead of the orginal image with lines.")
 	args = parser.parse_args()
 
 	input_filename = args.input_filename
@@ -62,9 +96,10 @@ def main():
 
 	image = imread(input_filename, cv2.IMREAD_GRAYSCALE).astype("int32")
 	angle_resolution = args.angle_resolution
+	write_hough_space = args.write_hough_space
 
-	houghImage = HoughTransform().execute(image, angle_resolution)
-	imwrite(outputFileName, houghImage)
+	outputImage = HoughTransform().execute(image, angle_resolution, write_hough_space)
+	imwrite(outputFileName, outputImage)
 	return 0
 
 # call to main
