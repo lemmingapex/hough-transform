@@ -14,4 +14,4 @@ python ./hough-transform.py --help
 
 https://en.wikipedia.org/wiki/Hough_transform
 
-Looking for imputs?  See https://github.com/lemmingapex/canny-edge-detector
+Looking for inputs?  See https://github.com/lemmingapex/canny-edge-detector
